@@ -1,0 +1,52 @@
+version: '3.7'
+services:
+  app:
+    container_name: productService
+    build:
+      context: ./
+      dockerfile: ./.docker/Dockerfile
+    image: 'laravelapp'
+    ports:
+      - 9000:80
+    links:
+      - productDb
+    volumes:
+      - .:/var/www/html/laravelMS/ezKartProductService
+    networks:
+      - ezkartaccservice_internal-network
+
+  productDb:
+    container_name: productDb
+    image: mysql:5.7
+    restart: always
+    ports:
+      - "3309:3306"
+    environment:
+      - MYSQL_DATABASE=${DB_DATABASE}
+      - MYSQL_USER=${DB_USERNAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - productVolume:/var/lib/mysql
+    networks:
+      - ezkartaccservice_internal-network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    ports:
+        - '8091:80'
+    restart: always
+    environment:
+        PMA_HOST: productDb
+    depends_on:
+        - productDb
+    networks:
+      - ezkartaccservice_internal-network
+
+volumes:
+  productVolume:
+    driver: local
+
+networks:
+  ezkartaccservice_internal-network:
+    external: true
