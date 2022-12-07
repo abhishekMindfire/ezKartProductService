@@ -16,3 +16,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::post('/createOrUpdateProduct', [App\Http\Controllers\ProductController::class, "createOrUpdateProduct"]);
+Route::get('/listProducts', [App\Http\Controllers\ProductController::class, "listProducts"]);
+Route::get('/getProduct/{productId}', [App\Http\Controllers\ProductController::class, "getProduct"]);
+Route::delete('/deleteProduct/{productId}', [App\Http\Controllers\ProductController::class, "deleteProduct"]);
