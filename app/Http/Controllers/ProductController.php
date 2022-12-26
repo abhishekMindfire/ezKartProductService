@@ -7,6 +7,9 @@ use App\Models\Products;
 use App\Models\ProductImages;
 use App\Http\Requests\CreateUpdateProductRequest;
 use Illuminate\Support\Facades\Storage;
+use Bschmitt\Amqp\Facades\Amqp;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ProductController extends Controller
 {
@@ -88,20 +91,36 @@ class ProductController extends Controller
      */
     public function createOrUpdateProduct(Request $request) {
         try {
+            // dd($request->toArray());
             $product = $request->toArray();
-            $product = $this->formatProduct($product);
+            $user = $request['user'];
             $message = "Product created successfully";
-            if($request['id']) {
-                $message = "Product updated successfully";
-            }
             $newProduct = Products::updateOrCreate([
                 'id'   => $request['id'],
             ],$product);
             if($newProduct) {
-                $productImagesIds = $this->uploadProductImagesToS3($newProduct->id, $product);
-                $newProduct->update(["image" => $productImagesIds]);
+                
+                if($request['id']) {
+                    $message = "Product updated successfully";
+                } else {
+                    // $response = Http::get('http://'.env("ACCOUNT_SERVICE_IP_ADDRESS").'/api/fetchUser', [
+                    //     'id' => $request['seller_id'],
+                    // ]);
+                    // $user = $response->json();
+                    $message = array(
+                        'user' => $request["user_id"],
+                        'product' => $newProduct,
+                        'email' =>$request["user_email"],
+                        'mail_template_id' => env("NEW_USER_TEMPLATE_ID"),
+                        'subject' => "New Product Notification",
+                        'mail_use' => "new_product_notfication"  
+                    );
+                    Amqp::publish('ezKartOtpVerification', json_encode($message), ['queue' => 'ezKartOtpVerification']);
+                    $productImagesIds = $this->uploadProductImagesToS3($newProduct->id, $product);
+                    $newProduct->update(["image" => $productImagesIds]);
+                }
                 $response = array(
-                    "message" => $message,
+                    "message" => $newProduct,
                     "status" => 200,
                 );
                 return response()->json($response);
@@ -127,6 +146,7 @@ class ProductController extends Controller
     }
 
     protected function uploadProductImagesToS3($productId, $product) {
+        
         foreach($product["images"] as $image) {
             $imageName = time().'.'.$image->extension();  
             $path = Storage::disk('s3')->put('images/productService/'.$productId, $image);
@@ -281,7 +301,7 @@ class ProductController extends Controller
      */
     public function getProduct(Products $productId, Request $request) {
         try {
-            $product = Products::where("id", $productId->id)->where("seller_id", $request["seller_id"])
+            $product = Products::where("id", $productId->id)
                         ->with(['category','subCategory','image'])
                         ->first()->toArray();
             if($product) {
